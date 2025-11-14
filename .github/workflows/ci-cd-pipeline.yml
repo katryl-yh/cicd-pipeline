@@ -109,7 +109,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
@@ -117,4 +117,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-
+      - name: Trigger Azure Container Refresh
+        run: |
+          curl -i -X POST "https://${{ secrets.AZURE_SCM_URL }}/docker/hook?site=${{ secrets.AZURE_WEBAPP_NAME }}"
+          echo "✅ Azure App Service notified to pull latest Docker image"
