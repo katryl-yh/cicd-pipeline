@@ -28,6 +28,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Runtime stage: Minimal image with only necessary files
 FROM python:3.12-slim-bookworm AS runtime
 
+# Capture build date and set as environment variable
+RUN BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") && \
+    echo "export BUILD_DATE=$BUILD_DATE" >> /etc/environment
+
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/src /app/src
 
@@ -44,7 +48,5 @@ WORKDIR /app
 # Expose port for web application
 EXPOSE 8501
 
-# Start Streamlit application
-CMD ["streamlit", "run", "src/webapp/app.py", \
-     "--server.address", "0.0.0.0", \
-     "--server.port", "8501"]
+# Start Streamlit application with build date
+CMD ["/bin/bash", "-c", "source /etc/environment && streamlit run src/webapp/app.py --server.address 0.0.0.0 --server.port 8501"]
