@@ -117,7 +117,77 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  deploy:
+    name: Deploy to Azure
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Validate Azure secrets
+        run: |
+          if [ -z "${{ secrets.AZURE_SCM_URL }}" ]; then
+            echo "❌ AZURE_SCM_URL secret not configured"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.AZURE_WEBAPP_NAME }}" ]; then
+            echo "❌ AZURE_WEBAPP_NAME secret not configured"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.AZURE_CREDENTIALS }}" ]; then
+            echo "❌ AZURE_CREDENTIALS secret not configured"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.AZURE_RESOURCE_GROUP }}" ]; then
+            echo "❌ AZURE_RESOURCE_GROUP secret not configured"
+            exit 1
+          fi
+          
+          echo "✅ Azure secrets are configured"
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get Azure Publish Profile
+        id: publish_profile
+        run: |
+          # Get publishing credentials using Azure CLI
+          PUBLISH_PROFILE=$(az webapp deployment list-publishing-credentials --name ${{ secrets.AZURE_WEBAPP_NAME }} --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }})
+          
+          PUBLISH_USERNAME=$(echo $PUBLISH_PROFILE | jq -r '.publishingUserName')
+          PUBLISH_PASSWORD=$(echo $PUBLISH_PROFILE | jq -r '.publishingPassword')
+          
+          echo "::add-mask::$PUBLISH_PASSWORD"
+          echo "username=$PUBLISH_USERNAME" >> $GITHUB_OUTPUT
+          echo "password=$PUBLISH_PASSWORD" >> $GITHUB_OUTPUT
+
       - name: Trigger Azure Container Refresh
         run: |
-          curl -i -X POST "https://${{ secrets.AZURE_SCM_URL }}/docker/hook?site=${{ secrets.AZURE_WEBAPP_NAME }}"
-          echo "✅ Azure App Service notified to pull latest Docker image"
+          echo "🚀 Triggering Azure Docker webhook..."
+          
+          response=$(curl -s -w "%{http_code}" \
+            -u "${{ steps.publish_profile.outputs.username }}:${{ steps.publish_profile.outputs.password }}" \
+            -X POST \
+            "https://${{ secrets.AZURE_SCM_URL }}/docker/hook?site=${{ secrets.AZURE_WEBAPP_NAME }}")
+          
+          http_code="${response: -3}"
+          
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 202 ]; then
+            echo "✅ Azure Docker webhook triggered successfully (HTTP $http_code)"
+            echo "Docker image pull initiated from Docker Hub"
+          else
+            echo "❌ Docker webhook failed with HTTP code: $http_code"
+            echo "Response: ${response%???}"
+            exit 1
+          fi
+
+      - name: Wait for deployment
+        run: |
+          echo "⏳ Waiting 45 seconds for Docker image pull and container refresh..."
+          sleep 45
+          echo "🎉 Docker deployment should be complete!"
+          echo "🌐 Check your app: https://app-crypto-dashboard-b8bacgegd5btexhz.swedencentral-01.azurewebsites.net/"
