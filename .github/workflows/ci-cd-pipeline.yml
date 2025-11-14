@@ -169,19 +169,23 @@ jobs:
         run: |
           echo "🚀 Triggering Azure Docker webhook..."
           
-          response=$(curl -s -w "%{http_code}" \
+          # Store response in temporary file
+          curl -s -w "HTTPSTATUS:%{http_code}" \
             -u "${{ steps.publish_profile.outputs.username }}:${{ steps.publish_profile.outputs.password }}" \
             -X POST \
-            "https://${{ secrets.AZURE_SCM_URL }}/docker/hook?site=${{ secrets.AZURE_WEBAPP_NAME }}")
+            "https://${{ secrets.AZURE_SCM_URL }}/docker/hook?site=${{ secrets.AZURE_WEBAPP_NAME }}" \
+            -o /tmp/response.txt
           
-          http_code="${response: -3}"
+          # Extract HTTP status code
+          http_code=$(grep -o "HTTPSTATUS:[0-9]*" /tmp/response.txt | cut -d: -f2)
+          response_body=$(sed 's/HTTPSTATUS:[0-9]*$//' /tmp/response.txt)
           
           if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 202 ]; then
             echo "✅ Azure Docker webhook triggered successfully (HTTP $http_code)"
             echo "Docker image pull initiated from Docker Hub"
           else
             echo "❌ Docker webhook failed with HTTP code: $http_code"
-            echo "Response: ${response%???}"
+            echo "Response: $response_body"
             exit 1
           fi
 
