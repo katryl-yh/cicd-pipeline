@@ -8,21 +8,13 @@ from webapp.utils import format_number_with_suffix
 
 st.set_page_config(page_title="Crypto Price", layout="centered")
 
-# Add version info at the top
-st.title("Crypto Dashboard")
-# Get build date from environment variable
+# Get build info from environment
 build_date = os.getenv('BUILD_DATE', 'Unknown')
+git_sha = os.getenv('GIT_SHA', 'Unknown')
 
-if build_date != 'Unknown':
-    try:
-        # Parse the GitHub timestamp and format it nicely
-        parsed_date = datetime.fromisoformat(build_date.replace('Z', '+00:00'))
-        formatted_date = parsed_date.strftime('%Y-%m-%d %H:%M:%S UTC')
-        st.info(f"🚀 Built: {formatted_date}")
-    except:
-        st.info(f"🚀 Built: {build_date}")
-else:
-    st.info(f"🚀 Development mode - Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+# Display in your app
+st.sidebar.text(f"Built: {build_date}")
+st.sidebar.text(f"Version: {git_sha[:7]}")
 
 @st.fragment(run_every=UPDATE_FREQ_SEC)
 def display_crypto_price():
