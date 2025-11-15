@@ -88,6 +88,12 @@ def test_response():
     assert isinstance(crypto_data["quote"]["USD"]["price"], (int, float)), "Price should be numeric"
     assert crypto_data["symbol"] == expected_symbol, f"Symbol should match expected cryptocurrency {expected_symbol}"
 
-    
+@pytest.mark.unit
+def test_intentional_failure():
+    """
+    Intentional failure to test error logging artifact generation.
+    This test should be removed after verifying the workflow.
+    """
+    assert False, "This test intentionally fails to test error logging"    
 
 
